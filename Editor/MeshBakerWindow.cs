@@ -20,7 +20,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace DevTools
+namespace InsaneOne.DevTools
 {
 	public sealed class MeshBakerWindow : EditorWindow
 	{
