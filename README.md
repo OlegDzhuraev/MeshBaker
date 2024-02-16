@@ -4,6 +4,7 @@ Allows you to combine several meshes, and combine their textures to atlases for 
 # Features
 - Supports up to 4 unique meshes per combine (instances of same meshes on scene can be bigger amount).
 - Bakes Albedo, Normal and Specular maps. In future updates it will be customizable.
+- Generates mesh UVs for Lightmapper.
 
 # Limitations
 All limitations may be removed in the future versions.
