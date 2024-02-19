@@ -1,6 +1,10 @@
 # Mesh Baker tool
 Allows you to combine several meshes, and combine their textures to atlases for optimization purposes.
 
+<p align="center">
+    <img src="https://dzhuraev.com/GithubData/MeshBakerTool01.png" width="410" height="419" alt="Mesh Baker Tool">
+</p>
+
 # Features
 - Supports up to 4 unique meshes per combine (unlimited for instances of the same meshes on scene).
 - Supports bake of Albedo, Normal, Specular/Metallic and AO maps to texture atlases. 
