@@ -3,14 +3,15 @@ Allows you to combine several meshes, and combine their textures to atlases for 
 
 # Features
 - Supports up to 4 unique meshes per combine (unlimited for instances of the same meshes on scene).
-- Bakes Albedo, Normal and Specular maps. In future updates these settings will be customizable.
+- Supports bake of Albedo, Normal, Specular/Metallic and AO maps to texture atlases. 
 - Generates mesh UVs for Lightmapper.
 
 # Limitations
 All limitations may be removed in the future versions.
 - Textures should have same size.
 - Textures should have Read/Write flag enabled.
-- Supports only BiRP materials.
+- Supports only BiRP materials (Standard and Standard (Specular setup)).
+- Max atlas size should be set to value x2 bigger than one mesh texture size (2048+ for 1024 textures, for example).
 
 # How to
 1. Open Tools -> Mesh Baker in the top menu. 
