@@ -25,10 +25,10 @@ namespace InsaneOne.DevTools
 		{
 			var tex = new Texture2D(width, height, format, false);
 			var pixels = tex.GetPixels();
-			
+
 			for (var q = 0; q < pixels.Length; q++)
 				pixels[q] = color;
-			
+
 			tex.SetPixels(pixels);
 			tex.Apply();
 

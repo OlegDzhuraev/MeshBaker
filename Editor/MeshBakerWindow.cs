@@ -26,7 +26,7 @@ namespace InsaneOne.DevTools
 	{
 		enum TextureType { Albedo, Normal, Specular, Metallic, AO }
 		
-		const int MaxUv = 2;
+		const int MaxUvRows = 2;
 		const int MaxUniqueMeshes = 4;
 		
 		static readonly int mainTexId = Shader.PropertyToID("_MainTex");
@@ -49,7 +49,8 @@ namespace InsaneOne.DevTools
 		
 		bool bakeNormals = true;
 		bool bakeSpecular = true;
-		bool bakeAo = false;
+		bool bakeAo;
+		bool sRgbFlagOnSpecular;
 		
 		MeshFilter targetMeshFilter;
 		bool disableOriginalMeshes;
@@ -97,6 +98,7 @@ namespace InsaneOne.DevTools
 			bakeNormals = EditorGUILayout.Toggle("Normals atlas", bakeNormals);
 			bakeSpecular = EditorGUILayout.Toggle("Specular/Metallic atlas", bakeSpecular);
 			bakeAo = EditorGUILayout.Toggle("AO atlas", bakeAo);
+			sRgbFlagOnSpecular = EditorGUILayout.Toggle(new GUIContent("sRGB on Specular/Metallic", "By design it should be DISABLED on these maps. But some assets was made with this flag enabled. So you can set it enabled here, if your assets using it and you want to keep same look for them."), sRgbFlagOnSpecular);
 
 			bakeFolder = SanitizeFilename(EditorGUILayout.TextField("Bake folder name", bakeFolder));
 			bakePostfix = SanitizeFilename(EditorGUILayout.TextField("Baked files postfix", bakePostfix));
@@ -109,6 +111,9 @@ namespace InsaneOne.DevTools
 				GUI.enabled = false;
 			}
 
+			GUILayout.Space(10);
+			EditorGUILayout.HelpBox("Bake process can take some time.", MessageType.Info);
+			
 			if (GUILayout.Button("Bake"))
 				ProceedMeshes();
 
@@ -203,13 +208,13 @@ namespace InsaneOne.DevTools
 			
 			foreach (var meshFilter in uniqueMeshFilters)
 			{
-				if (cell == MaxUv)
+				if (cell == MaxUvRows)
 				{
 					cell = 0;
 					row++;
 				}
 
-				if (row == MaxUv)
+				if (row == MaxUvRows)
 					throw new IndexOutOfRangeException("This baker does not supports this amount of unique UVs! Process terminated.");
 
 				var newUvs = new Vector2[meshFilter.sharedMesh.uv.Length];
@@ -304,11 +309,45 @@ namespace InsaneOne.DevTools
 			}
 
 			var finalMat = MakeMaterial(uniqueMaterials[0], isSpecularWorkflow);
+
+			var specType = isSpecularWorkflow ? TextureType.Specular : TextureType.Metallic;
+			
+			// in case of some textures bigger than anothers, we need to rescale them to the size of a smaller texture
+			// because current workflow does not supports different sizes on UV.
+			ResizeTextures(albedos, TextureType.Albedo);
+			ResizeTextures(speculars, specType);
+			ResizeTextures(normals, TextureType.Normal);
+			ResizeTextures(aos, TextureType.AO);
 			
 			MakeAtlas(albedos, TextureType.Albedo, finalMat);
-			MakeAtlas(speculars, isSpecularWorkflow ? TextureType.Specular : TextureType.Metallic, finalMat);
+			MakeAtlas(speculars, specType, finalMat);
 			MakeAtlas(normals, TextureType.Normal, finalMat);
 			MakeAtlas(aos, TextureType.AO, finalMat);
+		}
+
+		void ResizeTextures(Texture2D[] textures, TextureType type)
+		{
+			if (!IsNeedBake(type))
+				return;
+			
+			var minResolution = GetAtlasSize() / (MaxUniqueMeshes / MaxUvRows);
+			
+			foreach (var texture in textures)
+				if (texture.width < minResolution)
+					minResolution = texture.width;
+
+			for (var q = 0; q < textures.Length; q++)
+			{
+				var rawTexture = textures[q];
+				
+				if (rawTexture.width > minResolution)
+				{
+					var newTexture = new Texture2D(rawTexture.width, rawTexture.height, TextureFormat.ARGB32, true);
+					newTexture.SetPixels(rawTexture.GetPixels());
+					ThirdParty.TextureScale.Bilinear(newTexture, minResolution, minResolution);
+					textures[q] = newTexture; 
+				}
+			}
 		}
 
 		Material MakeMaterial(Material originalMat, bool isSpecular)
@@ -366,7 +405,7 @@ namespace InsaneOne.DevTools
 					: TextureImporterType.Default;
 
 				if (type == TextureType.Metallic || type == TextureType.Specular)
-					importer.sRGBTexture = false;
+					importer.sRGBTexture = sRgbFlagOnSpecular;
 				
 				importer.SaveAndReimport();
 			}
