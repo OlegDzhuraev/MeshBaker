@@ -15,7 +15,7 @@ All limitations may be removed in the future versions.
 - Textures should have same size.
 - Textures should have Read/Write flag enabled.
 - Supports only BiRP materials (Standard and Standard (Specular setup)).
-- Max atlas size should be set to value x2 bigger than one mesh texture size (2048+ for 1024 textures, for example).
+- Textures should have square aspect ratio. If textures have different sizes, them will be scaled to a smaller one in final texture atlas.
 
 # How to
 1. Open Tools -> Mesh Baker in the top menu. 
