@@ -24,10 +24,10 @@ namespace InsaneOne.DevTools
 {
 	public sealed class MeshBakerWindow : EditorWindow
 	{
+		enum TextureType { Albedo, Normal, Specular, Metallic, AO }
+		
 		const int MaxUv = 2;
 		const int MaxUniqueMeshes = 4;
-
-		const TextureFormat TexFormat = TextureFormat.RGBA32;
 		
 		static readonly int mainTexId = Shader.PropertyToID("_MainTex");
 		static readonly int specGlossMapId = Shader.PropertyToID("_SpecGlossMap");
@@ -51,7 +51,7 @@ namespace InsaneOne.DevTools
 		bool bakeSpecular = true;
 		bool bakeAo = false;
 		
-		MeshFilter finalMeshFilter;
+		MeshFilter targetMeshFilter;
 		bool disableOriginalMeshes;
 
 		string bakePostfix = "00";
@@ -68,10 +68,7 @@ namespace InsaneOne.DevTools
 			wnd.titleContent = new GUIContent("Mesh Baker");
 			wnd.minSize = new Vector2(400, 400);
 
-			wnd.richLabelStyle = new GUIStyle(EditorStyles.label)
-			{
-				richText = true
-			};
+			wnd.richLabelStyle = new GUIStyle(EditorStyles.label) { richText = true };
 		}
 
 		public void OnGUI()
@@ -79,8 +76,8 @@ namespace InsaneOne.DevTools
 			EditorGUILayout.HelpBox("This tool allows you to combine several meshes into one. Also, it combines their textures to one atlas for draw calls optimization.", MessageType.Info);
 			
 			GUILayout.Label("Scene settings", EditorStyles.boldLabel);
-			EditorGUILayout.HelpBox("Final mesh filter is filled automatically. But allows you to select MeshFilter component, where should be baken combined mesh.", MessageType.Info);
-			finalMeshFilter = EditorGUILayout.ObjectField("Final mesh filter", finalMeshFilter, typeof(MeshFilter), true) as MeshFilter;
+			EditorGUILayout.HelpBox("Target mesh filter is filled automatically. But allows you to select MeshFilter component, where should be baken combined mesh.", MessageType.Info);
+			targetMeshFilter = EditorGUILayout.ObjectField("Target mesh filter", targetMeshFilter, typeof(MeshFilter), true) as MeshFilter;
 			disableOriginalMeshes = EditorGUILayout.Toggle("Disable original meshes", disableOriginalMeshes);
 			
 			GUILayout.Label("Bake settings", EditorStyles.boldLabel);
@@ -144,14 +141,14 @@ namespace InsaneOne.DevTools
 			
 			var newMesh = CombineMeshes();
 
-			if (!finalMeshFilter)
+			if (!targetMeshFilter)
 			{
 				var go = new GameObject("CombinedMeshes");
-				finalMeshFilter = go.AddComponent<MeshFilter>();
+				targetMeshFilter = go.AddComponent<MeshFilter>();
 				go.AddComponent<MeshRenderer>();
 			}
 			
-			finalMeshFilter.sharedMesh = newMesh;
+			targetMeshFilter.sharedMesh = newMesh;
 
 			ProcessTextures();
 		}
@@ -180,6 +177,9 @@ namespace InsaneOne.DevTools
 				if (!go.TryGetComponent<MeshFilter>(out var meshFilter))
 					continue;
 
+				if (!go.TryGetComponent<MeshRenderer>(out var renderer) || renderer.sharedMaterial == null)
+					throw new NullReferenceException("One of selected Mesh Filters have no Renderer or its material is null! Bake process terminated.");
+				
 				toCombine.Add(meshFilter);
 
 				if (disableOriginalMeshes)
@@ -230,9 +230,7 @@ namespace InsaneOne.DevTools
 
 				if (meshFilter.TryGetComponent<MeshRenderer>(out var meshRenderer))
 					uniqueMaterials.Add(meshRenderer.sharedMaterial);
-				else
-					Debug.LogError("One of baking meshes have no MeshRenderer, so no info about its textures.");
-				
+	
 				cell++;
 			}
 		}
@@ -283,7 +281,7 @@ namespace InsaneOne.DevTools
 					speculars[q] = uniqueMaterial.GetTexture(isSpecularWorkflow ? specGlossMapId : metallicGlossMapId) as Texture2D;
 
 					if (!speculars[q])
-						speculars[q] = CreateFilledTexture(width, height, new Color(0.5f, 0.5f, 0.5f, 1f)); // we need unique tex (when content still same) for unity texture packer - otherwise packed amount will be changed
+						speculars[q] = Utils.CreateFilledTexture(width, height, new Color(0.5f, 0.5f, 0.5f, 1f)); // we need unique tex (when content still same) for unity texture packer - otherwise packed amount will be changed
 				}
 
 				if (bakeNormals)
@@ -291,9 +289,9 @@ namespace InsaneOne.DevTools
 					var loadedNormal = uniqueMaterial.GetTexture(bumpMapId) as Texture2D;
 
 					if (loadedNormal)
-						normals[q] = RestoreNormal(loadedNormal);
+						normals[q] = Utils.RestoreNormal(loadedNormal);
 					else
-						normals[q] = CreateFilledTexture(width, height, new Color(0.5f, 0.5f, 1f, 1f));
+						normals[q] = Utils.CreateFilledTexture(width, height, new Color(0.5f, 0.5f, 1f, 1f));
 				}
 				
 				if (bakeAo)
@@ -301,11 +299,11 @@ namespace InsaneOne.DevTools
 					aos[q] = uniqueMaterial.GetTexture(aoMapId) as Texture2D;
 
 					if (!aos[q])
-						aos[q] = CreateFilledTexture(width, height, new Color(1f, 1f, 1f, 1f));
+						aos[q] = Utils.CreateFilledTexture(width, height, new Color(1f, 1f, 1f, 1f));
 				}
 			}
 
-			var finalMat = MakeMaterial(uniqueMaterials[0]);
+			var finalMat = MakeMaterial(uniqueMaterials[0], isSpecularWorkflow);
 			
 			MakeAtlas(albedos, TextureType.Albedo, finalMat);
 			MakeAtlas(speculars, isSpecularWorkflow ? TextureType.Specular : TextureType.Metallic, finalMat);
@@ -313,7 +311,7 @@ namespace InsaneOne.DevTools
 			MakeAtlas(aos, TextureType.AO, finalMat);
 		}
 
-		Material MakeMaterial(Material originalMat)
+		Material MakeMaterial(Material originalMat, bool isSpecular)
 		{
 			var material = new Material(originalMat.shader);
 			material.CopyPropertiesFromMaterial(originalMat);
@@ -322,13 +320,13 @@ namespace InsaneOne.DevTools
 				material.EnableKeyword("_NORMALMAP");
 			
 			if (bakeSpecular)
-				material.EnableKeyword("_SPECGLOSSMAP");
+				material.EnableKeyword(isSpecular ? "_SPECGLOSSMAP" : "_METALLICGLOSSMAP");
 			
 			AssetDatabase.CreateAsset(material, $"{GetPath()}BakedMaterial{bakePostfix}.mat");
 			AssetDatabase.SaveAssets();
 			AssetDatabase.Refresh();
 
-			var meshRend = finalMeshFilter.GetComponent<MeshRenderer>();
+			var meshRend = targetMeshFilter.GetComponent<MeshRenderer>();
 			meshRend.sharedMaterial = material;
 			
 			return material;
@@ -344,13 +342,13 @@ namespace InsaneOne.DevTools
 			return path;
 		}
 		
-		Texture2D MakeAtlas(Texture2D[] textures, TextureType type, Material applyMaterial)
+		Texture2D MakeAtlas(Texture2D[] textures, TextureType type, Material applyMaterial, TextureFormat format = TextureFormat.RGBA32)
 		{
 			if (!IsNeedBake(type))
 				return null;
 
 			var atlasSize = GetAtlasSize();
-			var texture = new Texture2D(atlasSize, atlasSize, TexFormat, true);
+			var texture = new Texture2D(atlasSize, atlasSize, format, true);
 			texture.PackTextures(textures, 0, atlasSize);
 
 			var bytes = texture.EncodeToPNG();
@@ -381,37 +379,6 @@ namespace InsaneOne.DevTools
 			return finalTex;
 		}
 
-		/// <summary> We load textures from assets with all compression and post-processing from the asset processor.
-		/// So, when interacting with Normal, it is already packaged in a Unity normal format.
-		/// We need to unpack (reeturn) Normal-map channels back to default for correct result.</summary>
-		Texture2D RestoreNormal(Texture2D normal)
-		{
-			var tex = new Texture2D(normal.width, normal.height, TexFormat, true);
-			var normalPixels = normal.GetPixels();
-			
-			for (var q = 0; q < normalPixels.Length; q++)
-				normalPixels[q].r = normalPixels[q].a;
-			
-			tex.SetPixels(normalPixels);
-			tex.Apply();
-			
-			return tex;
-		}
-
-		Texture2D CreateFilledTexture(int width, int height, Color color)
-		{
-			var tex = new Texture2D(width, height, TexFormat, false);
-			var pixels = tex.GetPixels();
-			
-			for (var q = 0; q < pixels.Length; q++)
-				pixels[q] = color;
-			
-			tex.SetPixels(pixels);
-			tex.Apply();
-
-			return tex;
-		}
-
 		bool IsNeedBake(TextureType type)
 		{
 			return type switch
@@ -438,6 +405,4 @@ namespace InsaneOne.DevTools
 			};
 		}
 	}
-
-	enum TextureType { Albedo, Normal, Specular, Metallic, AO }
 }
