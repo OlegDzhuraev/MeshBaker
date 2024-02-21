@@ -12,7 +12,6 @@ Allows you to combine several meshes, and combine their textures to atlases for 
 
 # Limitations
 All limitations may be removed in the future versions.
-- Textures should have same size.
 - Textures should have Read/Write flag enabled.
 - Supports only BiRP materials (Standard and Standard (Specular setup)).
 - Textures should have square aspect ratio. If textures have different sizes, them will be scaled to a smaller one in final texture atlas.
