@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace InsaneOne.DevTools
 {
@@ -62,6 +63,8 @@ namespace InsaneOne.DevTools
 		GUIStyle richLabelStyle;
 
 		bool isSpecularWorkflow;
+
+		int neededVertices;
 		
 		[MenuItem("Tools/Mesh Baker")]
 		public static void ShowWindow()
@@ -174,6 +177,7 @@ namespace InsaneOne.DevTools
 			toCombine.Clear();
 			uniqueMaterials.Clear();
 			uniqueMeshFilters.Clear();
+			neededVertices = 0;
 		}
 
 		void Prepare()
@@ -196,6 +200,8 @@ namespace InsaneOne.DevTools
 					throw new NullReferenceException("One of selected Mesh Filters have no Renderer or its material is null! Bake process terminated.");
 				
 				toCombine.Add(meshFilter);
+
+				neededVertices += meshFilter.sharedMesh.vertexCount;
 
 				if (disableOriginalMeshes)
 					go.SetActive(false);
@@ -264,6 +270,7 @@ namespace InsaneOne.DevTools
 			}
 
 			var mesh = new Mesh();
+			mesh.indexFormat = neededVertices >= 65536 ? IndexFormat.UInt32 : IndexFormat.UInt16;
 			mesh.CombineMeshes(combineMeshes);
 			Unwrapping.GenerateSecondaryUVSet(mesh);
 

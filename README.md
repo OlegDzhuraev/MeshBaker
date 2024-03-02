@@ -10,6 +10,7 @@ Allows you to combine several meshes, and combine their textures to atlases for 
 - Supports bake of Albedo, Normal, Specular/Metallic and AO maps to texture atlases. 
 - Generates mesh UVs for Lightmapper.
 - Supports mesh save to the Assets folder.
+- Supports generated meshes with up to 4 billion vertices (but not guaranteed to rendered on all platforms. In this case, try to keep vertex count below than 65536).
 
 # Limitations
 All limitations may be removed in the future versions.
