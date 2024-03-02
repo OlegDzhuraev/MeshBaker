@@ -23,7 +23,7 @@ All limitations may be removed in the future versions.
 4. Press Bake in the tool interface.
 
 # Additional info
-- This tool sets Read/Write flag to enabled on all processed textures (to be able operate them).
+- This tool sets **Read/Write** flag value to **enabled** on all processed textures (to be able operate them).
 
 # License
 Apache 2.0 - free to use in commercial projects.
