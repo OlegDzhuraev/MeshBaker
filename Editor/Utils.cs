@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 
 namespace InsaneOne.DevTools
@@ -9,6 +10,8 @@ namespace InsaneOne.DevTools
 		/// We need to unpack (reeturn) Normal-map channels back to default for correct result.</summary>
 		public static Texture2D RestoreNormal(Texture2D normal, TextureFormat format = TextureFormat.RGBA32)
 		{
+			MakeTextureReadable(normal);
+			
 			var tex = new Texture2D(normal.width, normal.height, format, true);
 			var normalPixels = normal.GetPixels();
 			
@@ -33,6 +36,18 @@ namespace InsaneOne.DevTools
 			tex.Apply();
 
 			return tex;
+		}
+		
+		public static void MakeTextureReadable(Texture2D texture)
+		{
+			var path = AssetDatabase.GetAssetPath(texture);
+			var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+
+			if (importer && !importer.isReadable)
+			{
+				importer.isReadable = true;
+				AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+			}
 		}
 	}
 }

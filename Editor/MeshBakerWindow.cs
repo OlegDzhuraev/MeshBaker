@@ -51,6 +51,7 @@ namespace InsaneOne.DevTools
 		bool bakeSpecular = true;
 		bool bakeAo;
 		bool sRgbFlagOnSpecular;
+		bool saveMesh = true;
 		
 		MeshFilter targetMeshFilter;
 		bool disableOriginalMeshes;
@@ -99,21 +100,25 @@ namespace InsaneOne.DevTools
 			bakeSpecular = EditorGUILayout.Toggle("Specular/Metallic atlas", bakeSpecular);
 			bakeAo = EditorGUILayout.Toggle("AO atlas", bakeAo);
 			sRgbFlagOnSpecular = EditorGUILayout.Toggle(new GUIContent("sRGB on Specular/Metallic", "By design it should be DISABLED on these maps. But some assets was made with this flag enabled. So you can set it enabled here, if your assets using it and you want to keep same look for them."), sRgbFlagOnSpecular);
+			saveMesh = EditorGUILayout.Toggle(new GUIContent("Save mesh to assets", "Mesh can be stored directly on scene, or, for better management and scene size reduce, it can be stored in assets."), saveMesh);
 
 			bakeFolder = SanitizeFilename(EditorGUILayout.TextField("Bake folder name", bakeFolder));
 			bakePostfix = SanitizeFilename(EditorGUILayout.TextField("Baked files postfix", bakePostfix));
 		
 			var prevEnabled = GUI.enabled;
 
+			GUILayout.Space(10);
+			
 			if (Selection.gameObjects.Length < 2)
 			{
 				EditorGUILayout.HelpBox("Select at least 2 meshes to begin bake process.", MessageType.Info);
 				GUI.enabled = false;
 			}
+			else
+			{
+				EditorGUILayout.HelpBox("Bake process can take some time.", MessageType.Info);
+			}
 
-			GUILayout.Space(10);
-			EditorGUILayout.HelpBox("Bake process can take some time.", MessageType.Info);
-			
 			if (GUILayout.Button("Bake"))
 				ProceedMeshes();
 
@@ -151,6 +156,11 @@ namespace InsaneOne.DevTools
 				var go = new GameObject("CombinedMeshes");
 				targetMeshFilter = go.AddComponent<MeshFilter>();
 				go.AddComponent<MeshRenderer>();
+			}
+
+			if (saveMesh)
+			{
+				AssetDatabase.CreateAsset(newMesh, $"{GetPath()}BakedMesh{bakePostfix}.asset");
 			}
 			
 			targetMeshFilter.sharedMesh = newMesh;
@@ -226,7 +236,7 @@ namespace InsaneOne.DevTools
 					
 					uv = new Vector2(uv.x / 2, uv.y / (packToLine ? 1f : 2f));
 					uv.x += 0.5f * cell;
-					uv.y += packToLine ? 1f : 0.5f * row;
+					uv.y += packToLine ? 0f : 0.5f * row;
 						
 					newUvs[q] = uv;
 				}
@@ -340,6 +350,8 @@ namespace InsaneOne.DevTools
 			{
 				var rawTexture = textures[q];
 				
+				Utils.MakeTextureReadable(rawTexture);
+				
 				if (rawTexture.width > minResolution)
 				{
 					var newTexture = new Texture2D(rawTexture.width, rawTexture.height, TextureFormat.ARGB32, true);
@@ -349,6 +361,7 @@ namespace InsaneOne.DevTools
 				}
 			}
 		}
+
 
 		Material MakeMaterial(Material originalMat, bool isSpecular)
 		{
