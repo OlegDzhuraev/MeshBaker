@@ -1,5 +1,5 @@
 # Mesh Baker tool
-Allows you to combine several meshes, and combine their textures to atlases for optimization purposes.
+Allows you to combine several meshes into one, and combine their textures to atlases for optimization purposes.
 
 <p align="center">
     <img src="https://dzhuraev.com/GithubData/MeshBakerTool01.png" width="410" height="419" alt="Mesh Baker Tool">
