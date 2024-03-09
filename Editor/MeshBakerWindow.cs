@@ -26,10 +26,7 @@ namespace InsaneOne.DevTools
 	public sealed class MeshBakerWindow : EditorWindow
 	{
 		enum TextureType { Albedo, Normal, Specular, Metallic, AO }
-		
-		const int MaxUvRows = 2;
-		const int MaxUniqueMeshes = 4;
-		
+
 		static readonly int mainTexId = Shader.PropertyToID("_MainTex");
 		static readonly int specGlossMapId = Shader.PropertyToID("_SpecGlossMap");
 		static readonly int metallicGlossMapId = Shader.PropertyToID("_MetallicGlossMap");
@@ -60,11 +57,11 @@ namespace InsaneOne.DevTools
 		string bakePostfix = "00";
 		string bakeFolder = "Baked";
 
-		GUIStyle richLabelStyle;
-
 		bool isSpecularWorkflow;
 
 		int neededVertices;
+
+		Rect[] packingResult;
 		
 		[MenuItem("Tools/Mesh Baker")]
 		public static void ShowWindow()
@@ -72,8 +69,6 @@ namespace InsaneOne.DevTools
 			var wnd = GetWindow<MeshBakerWindow>();
 			wnd.titleContent = new GUIContent("Mesh Baker");
 			wnd.minSize = new Vector2(400, 400);
-
-			wnd.richLabelStyle = new GUIStyle(EditorStyles.label) { richText = true };
 		}
 
 		public void OnGUI()
@@ -89,7 +84,7 @@ namespace InsaneOne.DevTools
 			
 			GUILayout.BeginHorizontal();
 			
-			GUILayout.Label($"Max final atlas size: <b>{GetAtlasSize()}</b>", richLabelStyle);
+			GUILayout.Label($"Max final atlas size: <b>{GetAtlasSize()}</b>", BakerStyles.RichLabelStyle);
 			
 			if (GUILayout.Button("-"))
 				ChangeAtlasSize(false);
@@ -150,25 +145,15 @@ namespace InsaneOne.DevTools
 		{
 			Cleanup();
 			Prepare();
+			ProcessTextures();
 			ProceedUVs();
 			
 			var newMesh = CombineMeshes();
 
-			if (!targetMeshFilter)
-			{
-				var go = new GameObject("CombinedMeshes");
-				targetMeshFilter = go.AddComponent<MeshFilter>();
-				go.AddComponent<MeshRenderer>();
-			}
-
 			if (saveMesh)
-			{
 				AssetDatabase.CreateAsset(newMesh, $"{GetPath()}BakedMesh{bakePostfix}.asset");
-			}
-			
-			targetMeshFilter.sharedMesh = newMesh;
 
-			ProcessTextures();
+			targetMeshFilter.sharedMesh = newMesh;
 		}
 
 		void Cleanup()
@@ -210,49 +195,40 @@ namespace InsaneOne.DevTools
 				{
 					uniqueMeshFilters.Add(meshFilter);
 					uniqueMeshesUvs.Add(meshFilter.sharedMesh, Array.Empty<Vector2>());
+					
+					if (meshFilter.TryGetComponent<MeshRenderer>(out var meshRenderer))
+						uniqueMaterials.Add(meshRenderer.sharedMaterial);
 				}
 			}
-			
-			if (uniqueMeshFilters.Count > MaxUniqueMeshes)
-				throw new IndexOutOfRangeException($"Maximum unique meshes is {MaxUniqueMeshes}! Bake process terminated.");
+
+			if (!targetMeshFilter)
+			{
+				var go = new GameObject("CombinedMeshes");
+				targetMeshFilter = go.AddComponent<MeshFilter>();
+				go.AddComponent<MeshRenderer>();
+			}
 		}
 
 		void ProceedUVs()
 		{
-			var cell = 0;
-			var row = 0;
-			
-			foreach (var meshFilter in uniqueMeshFilters)
+			for (var q = 0; q < uniqueMeshFilters.Count; q++)
 			{
-				if (cell == MaxUvRows)
-				{
-					cell = 0;
-					row++;
-				}
-
-				if (row == MaxUvRows)
-					throw new IndexOutOfRangeException("This baker does not supports this amount of unique UVs! Process terminated.");
-
-				var newUvs = new Vector2[meshFilter.sharedMesh.uv.Length];
-				var packToLine = uniqueMeshFilters.Count < 3;
-				
-				for (var q = 0; q < newUvs.Length; q++)
-				{
-					var uv = meshFilter.sharedMesh.uv[q];
-					
-					uv = new Vector2(uv.x / 2, uv.y / (packToLine ? 1f : 2f));
-					uv.x += 0.5f * cell;
-					uv.y += packToLine ? 0f : 0.5f * row;
-						
-					newUvs[q] = uv;
-				}
-				
-				uniqueMeshesUvs[meshFilter.sharedMesh] = newUvs;
-
-				if (meshFilter.TryGetComponent<MeshRenderer>(out var meshRenderer))
-					uniqueMaterials.Add(meshRenderer.sharedMaterial);
+				var meshFilter = uniqueMeshFilters[q];
 	
-				cell++;
+				var newUvs = new Vector2[meshFilter.sharedMesh.uv.Length];
+				var newRect = packingResult[q];
+
+				for (var w = 0; w < newUvs.Length; w++)
+				{
+					var uv = meshFilter.sharedMesh.uv[w];
+
+					uv.x = Mathf.Lerp(newRect.x, newRect.x + newRect.width, uv.x);
+					uv.y = Mathf.Lerp(newRect.y, newRect.y + newRect.height, uv.y);
+
+					newUvs[w] = uv;
+				}
+
+				uniqueMeshesUvs[meshFilter.sharedMesh] = newUvs;
 			}
 		}
 		
@@ -347,7 +323,7 @@ namespace InsaneOne.DevTools
 			if (!IsNeedBake(type))
 				return;
 			
-			var minResolution = GetAtlasSize() / (MaxUniqueMeshes / MaxUvRows);
+			var minResolution = GetAtlasSize();
 			
 			foreach (var texture in textures)
 				if (texture.width < minResolution)
@@ -368,8 +344,7 @@ namespace InsaneOne.DevTools
 				}
 			}
 		}
-
-
+		
 		Material MakeMaterial(Material originalMat, bool isSpecular)
 		{
 			var material = new Material(originalMat.shader);
@@ -408,7 +383,10 @@ namespace InsaneOne.DevTools
 
 			var atlasSize = GetAtlasSize();
 			var texture = new Texture2D(atlasSize, atlasSize, format, true);
-			texture.PackTextures(textures, 0, atlasSize);
+			var packed = texture.PackTextures(textures, 0, atlasSize);
+
+			if (type == TextureType.Albedo)
+				packingResult = packed;
 
 			var bytes = texture.EncodeToPNG();
 			var fileName = $"Baked{type}{bakePostfix}.png";
