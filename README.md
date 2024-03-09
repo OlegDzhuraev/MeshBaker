@@ -17,10 +17,10 @@ Limitations may be removed in the future versions.
 - Supports only BiRP materials (Standard and Standard (Specular setup)).
 
 # How to
-1. Open Tools -> Mesh Baker in the top menu. 
+1. Open **Tools -> Mesh Baker** in the top menu. 
 2. Select required meshes on scene.
 3. Change parameters to fit your needs.
-4. Press Bake in the tool interface.
+4. Press **Bake** in the tool interface.
 
 # Recommendations
 - Textures are better to have square aspect ratio (non-square is supported, but not in the most efficient way). Also, if textures have different sizes, them will be scaled to a smaller one in the final texture atlas.
