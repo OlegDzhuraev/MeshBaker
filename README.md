@@ -1,3 +1,5 @@
+![GitHub License](https://img.shields.io/github/license/OlegDzhuraev/MeshBaker)
+
 # Mesh Baker tool
 Allows you to combine several meshes into one, and combine their textures to atlases for optimization purposes.
 
@@ -28,7 +30,3 @@ Limitations may be removed in the future versions.
 
 # Additional info
 - This tool sets **Read/Write** flag value to **enabled** on all processed textures (to be able operate them).
-
-# License
-Apache 2.0 - free to use in commercial projects.
-
